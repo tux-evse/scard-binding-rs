@@ -1,0 +1,86 @@
+{
+    "name": "afb-rust",
+    "no-ldpaths": true,
+    "port": 1234,
+    "alias": [
+        "/devtools:/usr/share/afb-ui-devtools/binder"
+    ],
+    "monitoring": true,
+    "tracereq": "all",
+    "binding": [
+        {
+            "uid": "nfc-reader",
+            "api": "scard",
+            "path": "${CARGO_TARGET_DIR}debug/libafb_nfc.so",
+            "info": "nfc ACU1222 Reader binding",
+            "nfc": {
+                "info": "Demo config with Mifare Classic",
+                "reader": "AU9540",
+                "keys": [
+                    {
+                        "uid": "key-a",
+                        "idx": 0,
+                        "value": [
+                            "0x01",
+                            "0x02",
+                            "0x03",
+                            "0x04",
+                            "0x05",
+                            "0x06"
+                        ]
+                    },
+                    {
+                        "uid": "key-b",
+                        "idx": 1,
+                        "value": [
+                            "0x0A",
+                            "0x0B",
+                            "0x0C",
+                            "0x0D",
+                            "0x0E",
+                            "0x0F"
+                        ]
+                    }
+                ],
+                "cmds": [
+                    {
+                        "uid": "get-contract",
+                        "action": "read",
+                        "sec": 1,
+                        "len": 48,
+                        "key": "key-a"
+                    },
+                    {
+                        "uid": "get-email",
+                        "action": "read",
+                        "sec": 2,
+                        "len": 48,
+                        "key": "key-a"
+                    },
+                    {
+                        "uid": "get-name",
+                        "action": "read",
+                        "sec": 3,
+                        "len": 48,
+                        "key": "key-a"
+                    },
+                    {
+                        "uid": "get-status",
+                        "action": "read",
+                        "sec": 4,
+                        "len": 48,
+                        "key": "key-a"
+                    },
+                                        {
+                        "uid": "set-status",
+                        "action": "write",
+                        "sec": 4,
+                        "len": 48,
+                        "key": "key-b",
+                        "data": "xxxxxxx"
+                    }
+                ]
+            }
+        }
+    ]
+}
