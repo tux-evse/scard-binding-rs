@@ -20,14 +20,30 @@ use afbv4::prelude::*;
 
 pub struct ScardHandle {
     pcsc: PcscClient,
+    ctrl: Option<*mut dyn ScardControl>,
 }
 
+pub type ScardAction = PcscAction;
+pub type ScardCmd = PcscCmd;
+
+pub enum MonitorAction {
+    START,
+    STOP,
+}
+
+pub enum ScardState {
+    PRESENT,
+    EMPTY,
+    UNKNOWN,
+}
 
 impl ScardHandle {
     // prepare handle for open operation
-    pub fn new(jconf: JsoncObj, verbosity: i32) -> Result<ScardHandle, AfbError> {
-        let pcsc= PcscClient::new (jconf, verbosity) ?;
-        Ok(ScardHandle{pcsc})
+    pub fn new(jconf: JsoncObj, verbosity: i32, callback: Option<*mut dyn PcscControl>) -> Result<ScardHandle, AfbError> {
+        let pcsc = PcscClient::new(jconf, verbosity, callback)?;
+
+        let handle= ScardHandle { pcsc, ctrl: None };
+        Ok(handle)
     }
 
     // register background callback to reader TBD
@@ -35,24 +51,50 @@ impl ScardHandle {
         Ok(self)
     }
 
-    pub fn reader_name (&self) -> &'static str {
+    pub fn reader_name(&self) -> &'static str {
         self.pcsc.get_reader_name()
     }
 
-    pub fn get_uuid(&self) -> Result <u64, AfbError> {
+    pub fn get_uuid(&self) -> Result<u64, AfbError> {
         self.pcsc.reader_check()?;
         self.pcsc.get_uuid()
     }
 
-    pub fn read_data(&self, cuid: &str) -> Result <String, AfbError> {
-        self.pcsc.reader_check()?;
-        self.pcsc.get_data(cuid)
+    pub fn get_cmd_by_uid(&self, cuid: &str) -> Result<ScardCmd, AfbError> {
+        self.pcsc.get_cmd_by_uid(cuid)
     }
 
-    pub fn send_data(&self, cuid: &str, data: &[u8]) -> Result <(), AfbError> {
-        self.pcsc.reader_check()?;
-        self.pcsc.set_data(cuid, data)
+    pub fn read_data(&self, cmd: &PcscCmd) -> Result<String, AfbError> {
+        self.get_uuid()?;
+        self.pcsc.get_data(cmd)
     }
 
+    pub fn write_data(&self, cmd: &PcscCmd, data: &[u8]) -> Result<(), AfbError> {
+        self.get_uuid()?;
+        self.pcsc.set_data(cmd, data)
+    }
+
+    pub fn set_callback(&mut self, ctrlbox: Box<dyn ScardControl>) -> &mut Self {
+        self.ctrl = Some(Box::leak(ctrlbox));
+        self
+    }
+
+    pub fn monitor(&self, action:MonitorAction) -> Result<u64, AfbError> {
+
+        let tid= match action {
+            MonitorAction::START => {
+                self.pcsc.monitor_start()?
+             },
+            MonitorAction::STOP => {
+                self.pcsc.monitor_stop(0)?;
+                0
+            },
+        };
+
+        Ok(tid)
+    }
 }
 
+pub trait ScardControl {
+    fn scard_monitor(&mut self, status: ScardState);
+}

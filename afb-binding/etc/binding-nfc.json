@@ -12,10 +12,11 @@
             "uid": "nfc-reader",
             "api": "scard",
             "path": "${CARGO_TARGET_DIR}debug/libafb_nfc.so",
-            "info": "nfc ACU1222 Reader binding",
+            "info": "nfc ACR122U Reader binding",
             "nfc": {
                 "info": "Demo config with Mifare Classic",
-                "reader": "AU9540",
+                "reader": "ACR122U",
+                "verbose": 1,
                 "keys": [
                     {
                         "uid": "key-a",
@@ -44,40 +45,41 @@
                 ],
                 "cmds": [
                     {
+                        "uid": "get-uuid",
+                        "info": "return smart scard uuid",
+                        "action": "uuid"
+                    },
+                    {
                         "uid": "get-contract",
-                        "action": "read",
-                        "sec": 1,
-                        "len": 48,
-                        "key": "key-a"
-                    },
-                    {
-                        "uid": "get-email",
-                        "action": "read",
-                        "sec": 2,
-                        "len": 48,
-                        "key": "key-a"
-                    },
-                    {
-                        "uid": "get-name",
+                        "info": "retrieve contract ID from NFC",
                         "action": "read",
                         "sec": 3,
                         "len": 48,
                         "key": "key-a"
                     },
                     {
-                        "uid": "get-status",
+                        "uid": "get-name",
+                        "info": "get customer contact info",
                         "action": "read",
                         "sec": 4,
                         "len": 48,
                         "key": "key-a"
                     },
-                                        {
+                    {
+                        "uid": "get-status",
+                        "info": "get current status from scard",
+                        "action": "read",
+                        "sec": 5,
+                        "len": 48,
+                        "key": "key-a"
+                    },
+                    {
                         "uid": "set-status",
+                        "info": "write current status in scard",
                         "action": "write",
-                        "sec": 4,
+                        "sec": 5,
                         "len": 48,
                         "key": "key-b",
-                        "data": "xxxxxxx"
                     }
                 ]
             }

@@ -11,40 +11,42 @@
  */
 
 use crate::prelude::*;
-use libnfc::prelude::*;
 use afbv4::prelude::*;
+use libnfc::prelude::*;
 use std::rc::Rc;
+use std::cell::Cell;
 
-struct SendScardCtx {
+struct WriteScardCtx {
     scard: Rc<ScardHandle>,
+    cmd: ScardCmd,
 }
 
-AfbVerbRegister!(SendScardVerb, send_scard_cb, SendScardCtx);
-fn send_scard_cb(rqt: &AfbRequest, args: &AfbData, ctx: &mut SendScardCtx) -> Result<(), AfbError> {
+AfbVerbRegister!(WriteScardVerb, write_scard_cb, WriteScardCtx);
+fn write_scard_cb(
+    rqt: &AfbRequest,
+    args: &AfbData,
+    ctx: &mut WriteScardCtx,
+) -> Result<(), AfbError> {
+    let data = args.get::<String>(0)?;
 
-    // extract command UUID
-    let cuid= args.get::<String>(0)?;
-    let data= args.get::<String>(1)?;
-
-    ctx.scard.send_data (cuid.as_str(),data.as_str().as_bytes())?;
+    ctx.scard.write_data(&ctx.cmd, data.as_str().as_bytes())?;
 
     rqt.reply(AFB_NO_DATA, 0);
     Ok(())
 }
 
-
 struct ReadScardCtx {
     scard: Rc<ScardHandle>,
+    cmd: ScardCmd,
 }
 
 AfbVerbRegister!(ReadScardVerb, read_scard_cb, ReadScardCtx);
-fn read_scard_cb(rqt: &AfbRequest, args: &AfbData, ctx: &mut ReadScardCtx) -> Result<(), AfbError> {
-
-    // extract command UUID
-    let cuid= args.get::<String>(0)?;
-
-    let data= ctx.scard.read_data (cuid.as_str())?;
-
+fn read_scard_cb(
+    rqt: &AfbRequest,
+    _args: &AfbData,
+    ctx: &mut ReadScardCtx,
+) -> Result<(), AfbError> {
+    let data = ctx.scard.read_data(&ctx.cmd)?;
     rqt.reply(data, 0);
     Ok(())
 }
@@ -54,49 +56,138 @@ struct UuidScardCtx {
 }
 
 AfbVerbRegister!(UuidScardVerb, uuid_scard_cb, UuidScardCtx);
-fn uuid_scard_cb(rqt: &AfbRequest, _args: &AfbData, ctx: &mut UuidScardCtx) -> Result<(), AfbError> {
-
-    let uuid= ctx.scard.get_uuid()?;
+fn uuid_scard_cb(
+    rqt: &AfbRequest,
+    _args: &AfbData,
+    ctx: &mut UuidScardCtx,
+) -> Result<(), AfbError> {
+    let uuid = ctx.scard.get_uuid()?;
     rqt.reply(uuid, 0);
+    Ok(())
+}
+
+struct ScardMonitorCtx {
+    event: &'static AfbEvent,
+    tid: Cell<u64>,
+}
+
+// TBD: this callback is call directly from CAPI, when it should be called from sacrd-nfc
+struct MonitorCtx {
+    monitor: Rc<ScardMonitorCtx>,
+}
+impl PcscControl for MonitorCtx {
+    fn scard_monitor(&mut self, scard: &PcscClient, status: PcscState) {
+        let count = match status {
+            PcscState::PRESENT => self.monitor.event.push("PRESENT"),
+            PcscState::EMPTY => self.monitor.event.push("ABSENT"),
+            PcscState::UNKNOWN => self.monitor.event.push("UNKNOWN"),
+        };
+
+        // no more listener let stop monitoring thread
+        if count == 0 {
+            //let _=scard.monitor_stop(self.monitor.tid.get());
+            //self.monitor.tid.set(0);
+        }
+    }
+}
+
+struct EventScardCtx {
+    scard: Rc<ScardHandle>,
+    monitor: Rc<ScardMonitorCtx>,
+}
+AfbVerbRegister!(EventScardVerb, event_scard_cb, EventScardCtx);
+fn event_scard_cb(
+    rqt: &AfbRequest,
+    args: &AfbData,
+    ctx: &mut EventScardCtx,
+) -> Result<(), AfbError> {
+    let args = args.get::<JsoncObj>(0)?;
+    let action = args.get::<String>("action")?;
+    match action.as_str() {
+        "START" => {
+            if ctx.monitor.tid.get() == 0 {
+                let tid = ctx.scard.monitor(MonitorAction::START)?;
+                ctx.monitor.tid.set(tid);
+            }
+            ctx.monitor.event.subscribe(rqt)?;
+        }
+        "STOP" => {
+            // monitoring thread stop is done within monitoring callback
+            ctx.monitor.event.unsubscribe(rqt)?;
+        }
+        _ => {}
+    }
+
+    rqt.reply(AFB_NO_DATA, 0);
     Ok(())
 }
 
 pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(), AfbError> {
 
     // parse NFC config and connect to reader
-    let handle=Rc::new(ScardHandle::new(config.nfc,config.verbosity)?);
+    let event = AfbEvent::new("reader");
+    let monitor = Rc::new(ScardMonitorCtx {
+        event: event,
+        tid: Cell::new(0),
+    });
 
-    let uuid_vb = AfbVerb::new("read_uuid")
-    .set_info("read scard uuid number")
-    .set_usage("no-input")
-    .set_callback(Box::new(UuidScardCtx {
-        scard: handle.clone(),
-    }))
-    .finalize()?;
+    let callback = Box::new(MonitorCtx {
+        monitor: monitor.clone(),
+    });
+    let scard = Rc::new(ScardHandle::new(
+        config.nfc.clone(),
+        config.verbosity,
+        Some(Box::leak(callback)),
+    )?);
 
-    let read_vb = AfbVerb::new("read_data")
-    .set_info("read data block from from scard using cuid=label")
-    .set_usage("cuid:string")
-    .set_sample("'user-id'")?
-    .set_sample("'get-status'")?
-    .set_callback(Box::new(ReadScardCtx {
-        scard: handle.clone(),
-    }))
-    .finalize()?;
+    let verb_ctx = Box::new(EventScardVerb {
+        scard: scard.clone(),
+        monitor: monitor.clone(),
+    });
 
-    let send_vb = AfbVerb::new("send_data")
-    .set_info("send data block to scard using cuid==label")
-    .set_usage("cuid:string")
-    .set_sample("'set-status'")?
-    .set_callback(Box::new(ReadScardCtx {
-        scard: handle.clone(),
-    }))
-    .finalize()?;
+    let _verb = AfbVerb::new("monitoring")
+        .set_info("subscribe to scard transaction event")
+        .set_action("['START','STOP']")?
+        .set_callback(verb_ctx)
+        .finalize()?;
 
-    // add verbs to api
-    api.add_verb(uuid_vb);
-    api.add_verb(read_vb);
-    api.add_verb(send_vb);
+    // TBD (Fulup) TBD Monitoring works but preempt pcscclient.
+    // It should probably use an independent pcscClient handle
+    // api.add_verb(verb);
+    // api.add_event(event);
+
+    // loop on command and create corresponding verbs
+    let cmds = config.nfc.clone().get::<JsoncObj>("cmds")?;
+    for idx in 0..cmds.count()? {
+        let cmd = cmds.index::<JsoncObj>(idx)?;
+        let cuid = cmd.get::<String>("uid")?;
+        let cmd = scard.get_cmd_by_uid(cuid.as_str())?;
+        let info = cmd.get_info();
+        let uid = cmd.get_uid();
+
+        let verb_ctx: Box<dyn AfbRqtControl> = match cmd.get_action() {
+            ScardAction::READ => Box::new(ReadScardVerb {
+                scard: scard.clone(),
+                cmd: cmd,
+            }),
+
+            ScardAction::WRITE => Box::new(WriteScardVerb {
+                scard: scard.clone(),
+                cmd: cmd,
+            }),
+
+            _ => Box::new(UuidScardVerb {
+                scard: scard.clone(),
+            }),
+        };
+
+        let verb = AfbVerb::new(uid)
+            .set_info(info)
+            .set_callback(verb_ctx)
+            .finalize()?;
+
+        api.add_verb(verb);
+    }
 
     Ok(())
 }

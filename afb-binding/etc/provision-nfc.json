@@ -1,6 +1,6 @@
 {
-    "info" : "Basic Scard provision for binding test",
-    "reader": "AU9540",
+    "info" : "pcscd-client --group=1 --config=provision-nfc.json",
+    "reader": "ACR122U",
     "keys": [
         {"uid":"key-a", "idx": 0, "value":["0x01","0x02","0x03","0x04","0x05","0x06"]},
         {"uid":"key-b", "idx": 1, "value":["0x0A","0x0B","0x0C","0x0D","0x0E","0x0F"]}
@@ -9,24 +9,25 @@
 
         {"uid":"get-uuid" ,"group":0,"action":"uuid"},
 
-        // set acl for sectors
-        {"uid":"acls-1"  , "group":99, "action":"trailer","sec":1,"blk":3, "trailer": {"keyA": "key-a","keyB":"key-b","acls":["0x08","0x77","0x8F","0x00"]}},
-        {"uid":"acls-2"  , "group":99, "action":"trailer","sec":2,"blk":3, "trailer": {"keyA": "key-a","keyB":"key-b","acls":["0x08","0x77","0x8F","0x00"]}},
-        {"uid":"acls-3"  , "group":99, "action":"trailer","sec":3,"blk":3, "trailer": {"keyA": "key-a","keyB":"key-b","acls":["0x08","0x77","0x8F","0x00"]}},
-        {"uid":"acls-4"  , "group":99, "action":"trailer","sec":4,"blk":3, "trailer": {"keyA": "key-a","keyB":"key-b","acls":["0x08","0x77","0x8F","0x00"]}},
-        {"uid":"acls-5"  , "group":99, "action":"trailer","sec":5,"blk":3, "trailer": {"keyA": "key-a","keyB":"key-b","acls":["0x08","0x77","0x8F","0x00"]}},
-        {"uid":"acls-6"  , "group":99, "action":"trailer","sec":6,"blk":3, "trailer": {"keyA": "key-a","keyB":"key-b","acls":["0x08","0x77","0x8F","0x00"]}},
+        // set acls sectors
+        {"uid":"acls-4"  , "group":9, "action":"trailer","sec":4,"blk":3, "trailer": {"keyA": "key-a","keyB":"key-b","acls":["0x08","0x77","0x8F","0x00"]}},
+        {"uid":"acls-5"  , "group":9, "action":"trailer","sec":5,"blk":3, "trailer": {"keyA": "key-a","keyB":"key-b","acls":["0x08","0x77","0x8F","0x00"]}},
+        {"uid":"acls-6"  , "group":9, "action":"trailer","sec":6,"blk":3, "trailer": {"keyA": "key-a","keyB":"key-b","acls":["0x08","0x77","0x8F","0x00"]}},
 
         // read sector with acl set in group=1
-        {"uid":"get-contract" ,"group":1,"action":"read","sec":1,"len":48,"key":"key-a"},
-        {"uid":"get-email"  ,"group":1,"action":"read","sec":2,"len":48,"key":"key-a"},
-        {"uid":"get-name"   ,"group":1,"action":"read","sec":3,"len":48,"key":"key-a"},
-        {"uid":"get-status","group":1,"action":"read","sec":4,"len":48,"key":"key-a"},
+        {"uid":"get-contract" ,"group":1,"action":"read","sec":3,"len":48,"key":"key-a"},
+        {"uid":"get-info"  ,"group":1,"action":"read","sec":4,"len":48,"key":"key-a"},
+        {"uid":"get-status"   ,"group":1,"action":"read","sec":5,"len":48,"key":"key-a"},
 
         // write sector with acl set in group=2
-        {"uid":"set-contract" ,"group":2,"action":"write","sec":1,"len":48,"key":"key-b", "data": "tuxevese-xxx-001"},
-        {"uid":"set-email"  ,"group":2,"action":"write","sec":2,"len":48,"key":"key-b", "data": "tuxevse@iot.bzh"},
-        {"uid":"set-name"   ,"group":2,"action":"write","sec":3,"len":48,"key":"key-b", "data": "Mr & Mme Kermichue"},
-        {"uid":"set-statusx" ,"group":2,"action":"write","sec":4,"len":48,"key":"key-b", "data": "xxxxxxxxxxxx"},
+        {"uid":"set-contract" ,"group":2,"action":"write","sec":3,"len":48,"key":"key-b", "data": "tuxevese-xxx-001"},
+        {"uid":"set-name"   ,"group":2,"action":"write","sec":4,"len":48,"key":"key-b", "data": "Mr Kermichue"},
+        {"uid":"set-status" ,"group":2,"action":"write","sec":5,"len":48,"key":"key-b", "data": "xxxxxxxxxxxx"},
+
+        // write sector with acl set in group=3
+        {"uid":"set-contract" ,"group":3,"action":"write","sec":3,"len":48,"key":"key-b", "data": "tuxevese-xxx-002"},
+        {"uid":"set-name"   ,"group":3,"action":"write","sec":4,"len":48,"key":"key-b", "data": "Mme Kermichue"},
+        {"uid":"set-status" ,"group":3,"action":"write","sec":5,"len":48,"key":"key-b", "data": "zzzzzzzzzzz"},
+
     ]
 }

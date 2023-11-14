@@ -27,5 +27,6 @@ mod scard;
 
 pub mod prelude {
     pub(crate) use crate::capi::*;
+    pub use crate::capi::{PcscControl, PcscState, PcscClient};
     pub use crate::scard::*;
 }

@@ -30,22 +30,27 @@ pub mod cglue {
     use afbv4::prelude::JsoncJso;
     type json_object = JsoncJso;
     #[repr(C)]
-    // map pscsc abstract pointer should remains allocate within C only
+    // map pcsc abstract pointer should remains allocate within C only
     pub struct pcscCmdT {
         not_to_be_used: u32,
     }
     include!("_capi-map.rs");
 }
 
+pub struct PcscCmd {
+    handle: *mut cglue::pcscCmdT,
+}
+
 pub struct PcscClient {
     config: *mut cglue::pcscConfigT,
     handle: Cell<*mut cglue::pcscHandleT>,
+    ctrl: Option<*mut dyn PcscControl>,
 }
 
 #[repr(u32)]
 #[derive(Debug, Copy, Clone)]
 #[allow(dead_code)]
-pub enum PcscsOption {
+pub enum PcscOption {
     UNKNOWN = cglue::pcscOptsE_PCSC_OPT_UNKNOWN,
     TIMEOUT = cglue::pcscOptsE_PCSC_OPT_TIMEOUT,
     VERBOSE = cglue::pcscOptsE_PCSC_OPT_VERBOSE,
@@ -53,7 +58,7 @@ pub enum PcscsOption {
 
 #[derive(Debug, Copy, Clone)]
 #[allow(dead_code)]
-pub enum PcscsState {
+pub enum PcscState {
     EMPTY,
     PRESENT,
     UNKNOWN,
@@ -78,17 +83,61 @@ pub extern "C" fn reader_monitor_cb(
 ) -> i32 {
     let ctx = unsafe { &mut *(ctx as *mut PcscClient) };
 
-    let state = match state {
-        cglue::PCSC_SCARD_STATE_EMPTY => PcscsState::EMPTY,
-        cglue::PCSC_SCARD_STATE_PRESENT => PcscsState::PRESENT,
-        _ => PcscsState::UNKNOWN,
-    };
-    ctx.callback(state)
+    let mut scard_state = PcscState::UNKNOWN;
+
+    if (state & cglue::PCSC_SCARD_STATE_EMPTY) != 0 {
+        scard_state = PcscState::EMPTY
+    }
+    if (state & cglue::PCSC_SCARD_STATE_PRESENT) != 0 {
+        scard_state = PcscState::PRESENT
+    }
+
+    match  ctx.ctrl {
+        None => {},
+        Some(ctrl) => unsafe {(*ctrl).scard_monitor(ctx, scard_state);}
+    }
+
+    0
+}
+
+pub enum PcscAction {
+    READ,
+    WRITE,
+    UUID,
+}
+
+pub trait PcscControl {
+    fn scard_monitor(&mut self, pcsc: &PcscClient, status: PcscState);
+}
+
+impl PcscCmd {
+    pub fn get_action(&self) -> PcscAction {
+        match unsafe { cglue::pcscCmdAction(self.handle) } {
+            cglue::pcscActionE_PCSC_ACTION_READ => PcscAction::READ,
+            cglue::pcscActionE_PCSC_ACTION_WRITE => PcscAction::WRITE,
+            cglue::pcscActionE_PCSC_ACTION_UUID => PcscAction::UUID,
+            _ => PcscAction::UUID,
+        }
+    }
+
+    pub fn get_uid(&self) -> &'static str {
+        match unsafe { CStr::from_ptr(cglue::pcscCmdUid(self.handle)) }.to_str() {
+            Err(_) => "Not-UTF8-uid",
+            Ok(value) => value,
+        }
+    }
+
+    pub fn get_info(&self) -> &'static str {
+        match unsafe { CStr::from_ptr(cglue::pcscCmdInfo(self.handle)) }.to_str() {
+            Err(_) => "Not-UTF8-uid",
+            Ok(value) => value,
+        }
+    }
 }
 
 impl PcscClient {
     // prepare handle for open operation
-    pub fn new(jconf: JsoncObj, verbosity: i32) -> Result<PcscClient, AfbError> {
+    pub fn new(jconf: JsoncObj, verbosity: i32, callback:Option <*mut dyn PcscControl>) -> Result<PcscClient, AfbError> {
         let config = unsafe { cglue::pcscParseConfig(jconf.into_raw(), verbosity) };
         if config == 0 as *mut cglue::pcscConfigT {
             return Err(AfbError::new("pcsc-config-fail", jconf.to_string()));
@@ -97,6 +146,7 @@ impl PcscClient {
         let client = PcscClient {
             config,
             handle: Cell::new(0 as *mut cglue::pcscHandleT),
+            ctrl: callback,
         };
 
         // connect and return object of successful
@@ -104,15 +154,10 @@ impl PcscClient {
         Ok(client)
     }
 
-    // move back pointer to object
-    pub fn get_config(&self) -> &cglue::pcscConfigT {
-        unsafe { &*(self.config) }
-    }
-
     pub fn get_reader_name(&self) -> &'static str {
         let handle = self.handle.get();
         match unsafe { CStr::from_ptr(cglue::pcscReaderName(handle)) }.to_str() {
-            Err(_) => "not UTF8 reader devname",
+            Err(_) => "Not-UTF8-reader-name",
             Ok(value) => value,
         }
     }
@@ -126,13 +171,11 @@ impl PcscClient {
     }
 
     pub fn connect(&self) -> Result<&Self, AfbError> {
-        let config = self.get_config();
-
-        let handle = unsafe { cglue::pcscConnect(config.uid, config.reader) };
+        let handle = unsafe { cglue::pcscConnect((*self.config).uid, (*self.config).reader) };
         if handle == 0 as *mut cglue::pcscHandleT {
             return Err(AfbError::new(
                 "pcsc-connect-fail",
-                format!("Fail to connect to reader={}", self.get_reader_name()),
+                format!("Fail to connect to reader check config"),
             ));
         }
 
@@ -141,26 +184,13 @@ impl PcscClient {
             cglue::pcscSetOpt(
                 handle,
                 cglue::pcscOptsE_PCSC_OPT_VERBOSE,
-                config.verbose as u64,
+                (*self.config).verbose as u64,
             );
-            cglue::pcscSetOpt(handle, cglue::pcscOptsE_PCSC_OPT_TIMEOUT, config.timeout);
-        }
-
-        let tid = unsafe {
-            cglue::pcscMonitorReader(
+            cglue::pcscSetOpt(
                 handle,
-                Some(reader_monitor_cb),
-                self as *const _ as *mut std::ffi::c_void,
-            )
-        };
-        if tid <= 0 {
-            return Err(AfbError::new(
-                "pcsc-monitoring-fail",
-                format!(
-                    "Fail start reader monitoring thread reader={}",
-                    self.get_reader_name()
-                ),
-            ));
+                cglue::pcscOptsE_PCSC_OPT_TIMEOUT,
+                (*self.config).timeout,
+            );
         }
 
         // update handle with object cell
@@ -169,19 +199,47 @@ impl PcscClient {
         Ok(self)
     }
 
-    // call from reader monitoring
-    pub(crate) fn callback(&self, state: PcscsState) -> i32 {
-        let _handle = self.handle.get();
+    // monitor one transaction (until scard is removed)
+    pub fn monitor_start(&self) -> Result<u64, AfbError> {
+        let handle = self.handle.get();
 
-        match state {
-            PcscsState::PRESENT => {
-                let _err = self.get_uuid();
-                0
-            }
+        let tid = unsafe {
+            cglue::pcscMonitorReader(
+                handle,
+                Some(reader_monitor_cb),
+                self as *const _ as *mut std::ffi::c_void,
+            )
+        };
 
-            PcscsState::EMPTY => -1,
-            _ => -1,
+        if tid == 0 {
+            return Err(AfbError::new(
+                "pcsc-monitoring-start",
+                format!(
+                    "Fail start reader monitoring thread reader={}",
+                    self.get_reader_name()
+                ),
+            ));
         }
+        Ok(tid)
+    }
+
+    // monitor one transaction (until scard is removed)
+    pub fn monitor_stop(&self, tid: u64) -> Result<(), AfbError> {
+        let handle = self.handle.get();
+
+        let rc =
+            unsafe { cglue::pcscMonitorWait(handle, cglue::pcscMonitorActionE_PCSC_MONITOR_WAIT, tid) };
+
+        if rc <= 0 {
+            return Err(AfbError::new(
+                "pcsc-monitoring-stop",
+                format!(
+                    "Fail start reader monitoring thread reader={}",
+                    self.get_reader_name()
+                ),
+            ));
+        }
+        Ok(())
     }
 
     pub fn get_uuid(&self) -> Result<u64, AfbError> {
@@ -226,7 +284,7 @@ impl PcscClient {
         Ok(())
     }
 
-    fn get_cmd_by_uid(&self, cuid: &str) -> Result<*mut cglue::pcscCmdT, AfbError> {
+    pub fn get_cmd_by_uid(&self, cuid: &str) -> Result<PcscCmd, AfbError> {
         let suid = match CString::new(cuid) {
             Ok(value) => value,
             Err(_) => {
@@ -244,35 +302,22 @@ impl PcscClient {
                 format!("Command cuid={} not found", cuid),
             ));
         }
-
-        Ok(cmd)
+        Ok(PcscCmd { handle: cmd })
     }
 
-    pub fn get_data(&self, cuid: &str) -> Result<String, AfbError> {
+    pub fn get_data(&self, cmd: &PcscCmd) -> Result<String, AfbError> {
         let handle = self.handle.get();
-        let cmd = self.get_cmd_by_uid(cuid)?;
-
-        if unsafe { cglue::pcscCmdAction(cmd) } != cglue::pcscActionE_PCSC_ACTION_READ {
-            return Err(AfbError::new(
-                "scard-cuid-action",
-                format!("Command cuid={} is not a read action", cuid),
-            ));
-        }
 
         // Fulup TBD initializing this buffer is stupid
-        let mut buffer = vec![0; unsafe { cglue::pcscCmdDataLen(cmd) }].into_boxed_slice();
+        let mut buffer = vec![0; unsafe { cglue::pcscCmdDataLen(cmd.handle) }].into_boxed_slice();
         let cdata = buffer.as_mut_ptr();
 
         // try to get card UUID (work with almost any model)
-        let err = unsafe { cglue::pcscExecOneCmd(handle, cmd, cdata) };
-        if err == 0 {
+        let err = unsafe { cglue::pcscExecOneCmd(handle, cmd.handle, cdata) };
+        if err < 0 {
             return Err(AfbError::new(
                 "scard-cuid-read",
-                format!(
-                    "Fail reading smart card cuid={} error={}",
-                    cuid,
-                    self.get_reader_error()
-                ),
+                format!("cuid={} error={}", cmd.get_uid(), self.get_reader_error()),
             ));
         }
 
@@ -283,7 +328,7 @@ impl PcscClient {
                 Err(_) => {
                     return Err(AfbError::new(
                         "scard-cuid-data",
-                        format!("Fail concerting smard cuid={} data to utf8", cuid,),
+                        format!("cuid={} no utf8 data", cmd.get_uid(),),
                     ))
                 }
                 Ok(value) => value,
@@ -295,33 +340,23 @@ impl PcscClient {
             None,
             "Reader={} cuid={} data={}",
             self.get_reader_name(),
-            cuid,
+            cmd.get_uid(),
             slice
         );
         Ok(slice.to_string())
     }
 
-    pub fn set_data(&self, cuid: &str, data: &[u8]) -> Result<(), AfbError> {
+    pub fn set_data(&self, cmd: &PcscCmd, data: &[u8]) -> Result<(), AfbError> {
         let handle = self.handle.get();
-        let cmd = self.get_cmd_by_uid(cuid)?;
-
-        if unsafe { cglue::pcscCmdAction(cmd) } != cglue::pcscActionE_PCSC_ACTION_WRITE {
-            return Err(AfbError::new(
-                "scard-cuid-action",
-                format!("Command cuid={} is not a write action", cuid),
-            ));
-        }
 
         // try to get card UUID (work with almost any model)
-        let err = unsafe { cglue::pcscExecOneCmd(handle, cmd, data.as_ptr() as *const _ as *mut u8) };
-        if err == 0 {
+        let err = unsafe {
+            cglue::pcscExecOneCmd(handle, cmd.handle, data.as_ptr() as *const _ as *mut u8)
+        };
+        if err < 0 {
             return Err(AfbError::new(
                 "scard-cuid-write",
-                format!(
-                    "Fail writing smart card cuid={} error={}",
-                    cuid,
-                    self.get_reader_error()
-                ),
+                format!("cuid={} {}", cmd.get_uid(), self.get_reader_error()),
             ));
         }
 
