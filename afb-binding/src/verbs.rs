@@ -76,7 +76,7 @@ struct MonitorCtx {
     monitor: Rc<ScardMonitorCtx>,
 }
 impl PcscControl for MonitorCtx {
-    fn scard_monitor(&mut self, scard: &PcscClient, status: PcscState) {
+    fn scard_monitor(&mut self, _scard: &PcscClient, status: PcscState) {
         let count = match status {
             PcscState::PRESENT => self.monitor.event.push("PRESENT"),
             PcscState::EMPTY => self.monitor.event.push("ABSENT"),

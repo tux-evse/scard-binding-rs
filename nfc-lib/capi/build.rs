@@ -14,7 +14,7 @@ fn main() {
 
     let header = "
     // -----------------------------------------------------------------------
-    //         <- private '_capipcsc.rs' Rust/C unsafe binding ->
+    //         <- private '_capi_map.rs' Rust/C unsafe binding ->
     // -----------------------------------------------------------------------
     //   Do not exit this file it will be regenerated automatically by cargo.
     //   Check:
@@ -23,12 +23,12 @@ fn main() {
     // -----------------------------------------------------------------------
     ";
 
-    let _capipcsc
+    let _capi_map
      = bindgen::Builder::default()
         .header("capi/capi-map.h")
         .clang_arg("-F/usr/include/PCSC")
         .raw_line(header)
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .derive_debug(false)
         .layout_tests(false)
         .allowlist_function("pcsc.*")
@@ -40,7 +40,7 @@ fn main() {
         .generate()
         .expect("Unable to generate _capi-map.rs");
 
-    _capipcsc
+    _capi_map
         .write_to_file("capi/_capi-map.rs")
         .expect("Couldn't write _capi-map.rs!");
 }
