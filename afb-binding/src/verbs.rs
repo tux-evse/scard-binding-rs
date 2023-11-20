@@ -13,8 +13,8 @@
 use crate::prelude::*;
 use afbv4::prelude::*;
 use libnfc::prelude::*;
-use std::rc::Rc;
 use std::cell::Cell;
+use std::rc::Rc;
 
 struct WriteScardCtx {
     scard: Rc<ScardHandle>,
@@ -101,21 +101,18 @@ fn event_scard_cb(
     args: &AfbData,
     ctx: &mut EventScardCtx,
 ) -> Result<(), AfbError> {
-    let args = args.get::<JsoncObj>(0)?;
-    let action = args.get::<String>("action")?;
-    match action.as_str() {
-        "START" => {
+    match args.get::<&ApiAction>(0)? {
+        ApiAction::START => {
             if ctx.monitor.tid.get() == 0 {
                 let tid = ctx.scard.monitor(MonitorAction::START)?;
                 ctx.monitor.tid.set(tid);
             }
             ctx.monitor.event.subscribe(rqt)?;
         }
-        "STOP" => {
+        ApiAction::STOP => {
             // monitoring thread stop is done within monitoring callback
             ctx.monitor.event.unsubscribe(rqt)?;
         }
-        _ => {}
     }
 
     rqt.reply(AFB_NO_DATA, 0);
@@ -123,7 +120,6 @@ fn event_scard_cb(
 }
 
 pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(), AfbError> {
-
     // parse NFC config and connect to reader
     let event = AfbEvent::new("reader");
     let monitor = Rc::new(ScardMonitorCtx {

@@ -13,6 +13,7 @@
             "api": "scard",
             "path": "${CARGO_TARGET_DIR}debug/libafb_nfc.so",
             "info": "nfc ACR122U Reader binding",
+            "permission": "acl:nfc:client",
             "nfc": {
                 "info": "Demo config with Mifare Classic",
                 "reader": "ACR122U",

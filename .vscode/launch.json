@@ -18,7 +18,7 @@
                 "--monitoring",
                 "--trap-faults=0",
                 "--tracereq=all",
-                "--config=afb-binding/etc/binding-nfc.json",
+                "--config=afb-binding/etc/binding-nfc-acr122u.json",
             ],
             "cwd": "${workspaceFolder}",
             "initCommands": [

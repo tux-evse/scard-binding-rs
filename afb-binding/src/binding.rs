@@ -20,12 +20,11 @@ pub(crate) fn to_static_str(value: String) -> &'static str {
 AfbDataConverter!(api_actions, ApiAction);
 use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Default)]
-#[serde(rename_all = "UPPERCASE")]
+#[serde(rename_all = "lowercase", tag = "action")]
 pub(crate) enum ApiAction {
     #[default]
-    READ,
-    SUBSCRIBE,
-    UNSUBSCRIBE,
+    START,
+    STOP,
 }
 
 pub struct BindingCfg {
@@ -37,6 +36,8 @@ pub struct BindingCfg {
 // Binding init callback started at binding load time before any API exist
 // -----------------------------------------
 pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi, AfbError> {
+    // add binding custom converter
+    api_actions::register()?;
 
     let uid = if let Ok(value) = jconf.get::<String>("uid") {
         to_static_str(value)
@@ -56,9 +57,16 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
         ""
     };
 
-    afb_log_msg!(Info, rootv4, "Binding starting uid:{} api:{} info:{}", uid, api, info);
+    afb_log_msg!(
+        Info,
+        rootv4,
+        "Binding starting uid:{} api:{} info:{}",
+        uid,
+        api,
+        info
+    );
 
-    let acls = if let Ok(value) = jconf.get::<String>("acls") {
+    let permission = if let Ok(value) = jconf.get::<String>("acls") {
         AfbPermission::new(to_static_str(value))
     } else {
         AfbPermission::new("acl:nfc:client")
@@ -86,7 +94,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     };
 
     // create backend API
-    let api = AfbApi::new(api).set_info(info).set_permission(acls);
+    let api = AfbApi::new(api).set_info(info).set_permission(permission);
     register_verbs(api, config)?;
 
     Ok(api.finalize()?)
