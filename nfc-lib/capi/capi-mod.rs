@@ -140,7 +140,7 @@ impl PcscClient {
     pub fn new(jconf: JsoncObj, verbosity: i32, callback:Option <*mut dyn PcscControl>) -> Result<PcscClient, AfbError> {
         let config = unsafe { cglue::pcscParseConfig(jconf.into_raw(), verbosity) };
         if config == 0 as *mut cglue::pcscConfigT {
-            return Err(AfbError::new("pcsc-config-fail", jconf.to_string()));
+            return afb_error!("pcsc-config-fail", jconf.to_string())
         }
 
         let client = PcscClient {
@@ -173,10 +173,10 @@ impl PcscClient {
     pub fn connect(&self) -> Result<&Self, AfbError> {
         let handle = unsafe { cglue::pcscConnect((*self.config).uid, (*self.config).reader) };
         if handle == 0 as *mut cglue::pcscHandleT {
-            return Err(AfbError::new(
+            return afb_error!(
                 "pcsc-connect-fail",
-                format!("Fail to connect to reader check config"),
-            ));
+                "Fail to connect to reader check config"
+            );
         }
 
         // set reader options
@@ -212,13 +212,12 @@ impl PcscClient {
         };
 
         if tid == 0 {
-            return Err(AfbError::new(
+            return afb_error!(
                 "pcsc-monitoring-start",
-                format!(
-                    "Fail start reader monitoring thread reader={}",
+                                    "Fail start reader monitoring thread reader={}",
                     self.get_reader_name()
-                ),
-            ));
+
+            )
         }
         Ok(tid)
     }
@@ -231,13 +230,11 @@ impl PcscClient {
             unsafe { cglue::pcscMonitorWait(handle, cglue::pcscMonitorActionE_PCSC_MONITOR_WAIT, tid) };
 
         if rc <= 0 {
-            return Err(AfbError::new(
+            return afb_error!(
                 "pcsc-monitoring-stop",
-                format!(
                     "Fail start reader monitoring thread reader={}",
                     self.get_reader_name()
-                ),
-            ));
+            )
         }
         Ok(())
     }
@@ -248,13 +245,11 @@ impl PcscClient {
         // try to get card UUID (work with almost any model)
         let uuid = unsafe { cglue::pcscGetCardUuid(handle) };
         if uuid == 0 {
-            return Err(AfbError::new(
+            return afb_error!(
                 "pcsc-get-uuid",
-                format!(
                     "Fail reading smart card UUID error={}",
                     self.get_reader_error()
-                ),
-            ));
+            )
         }
         afb_log_msg!(
             Debug,
@@ -272,14 +267,12 @@ impl PcscClient {
         // get reader status and wait 10 timeout for card
         let err = unsafe { cglue::pcscReaderCheck(handle, 10) };
         if err != 0 {
-            return Err(AfbError::new(
+            return afb_error!(
                 "pcsc-sync-check",
-                format!(
                     "Fail connecting to reader={} error={}",
                     self.get_reader_name(),
                     self.get_reader_error()
-                ),
-            ));
+            )
         }
         Ok(())
     }
@@ -288,19 +281,19 @@ impl PcscClient {
         let suid = match CString::new(cuid) {
             Ok(value) => value,
             Err(_) => {
-                return Err(AfbError::new(
+                return afb_error!(
                     "scard-cuid-invalid",
-                    format!("Command cuid={} invalid", cuid),
-                ))
+                    "Command cuid={} invalid", cuid
+                )
             }
         };
 
         let cmd = unsafe { cglue::pcscCmdByUid(self.config, suid.as_ptr()) };
         if cmd == 0 as *mut cglue::pcscCmdT {
-            return Err(AfbError::new(
+            return afb_error!(
                 "scard-cuid-missing",
-                format!("Command cuid={} not found", cuid),
-            ));
+                "Command cuid={} not found", cuid
+            )
         }
         Ok(PcscCmd { handle: cmd })
     }
@@ -315,10 +308,10 @@ impl PcscClient {
         // try to get card UUID (work with almost any model)
         let err = unsafe { cglue::pcscExecOneCmd(handle, cmd.handle, cdata) };
         if err < 0 {
-            return Err(AfbError::new(
+            return afb_error!(
                 "scard-cuid-read",
-                format!("cuid={} error={}", cmd.get_uid(), self.get_reader_error()),
-            ));
+                "cuid={} error={}", cmd.get_uid(), self.get_reader_error()
+            )
         }
 
         // return data is a C string
@@ -326,10 +319,10 @@ impl PcscClient {
         let slice = {
             match cstring.to_str() {
                 Err(_) => {
-                    return Err(AfbError::new(
+                    return afb_error!(
                         "scard-cuid-data",
-                        format!("cuid={} no utf8 data", cmd.get_uid(),),
-                    ))
+                        "cuid={} no utf8 data", cmd.get_uid()
+                    )
                 }
                 Ok(value) => value,
             }
@@ -354,10 +347,10 @@ impl PcscClient {
             cglue::pcscExecOneCmd(handle, cmd.handle, data.as_ptr() as *const _ as *mut u8)
         };
         if err < 0 {
-            return Err(AfbError::new(
+            return afb_error!(
                 "scard-cuid-write",
-                format!("cuid={} {}", cmd.get_uid(), self.get_reader_error()),
-            ));
+                "cuid={} {}", cmd.get_uid(), self.get_reader_error()
+            )
         }
 
         Ok(())
