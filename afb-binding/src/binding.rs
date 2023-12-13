@@ -75,10 +75,10 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     let nfc = if let Ok(value) = jconf.get::<JsoncObj>("nfc") {
         value
     } else {
-        return Err(AfbError::new(
+        return afb_error!(
             "nfc-config-fail",
-            "mandatory nfc' config missing",
-        ));
+            "mandatory nfc' config missing"
+        )
     };
 
     let verbosity = if let Ok(value) = jconf.get::<i32>("verbosity") {
