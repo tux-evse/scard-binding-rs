@@ -66,7 +66,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
         info
     );
 
-    let permission = if let Ok(value) = jconf.get::<String>("acls") {
+    let permission = if let Ok(value) = jconf.get::<String>("permission") {
         AfbPermission::new(to_static_str(value))
     } else {
         AfbPermission::new("acl:nfc:client")

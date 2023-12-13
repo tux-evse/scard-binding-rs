@@ -1,5 +1,5 @@
 {
-    "name": "afb-rust",
+    "name": "afb-scard",
     "no-ldpaths": true,
     "port": 1234,
     "alias": [

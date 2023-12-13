@@ -6,12 +6,17 @@
  * License: $RP_BEGIN_LICENSE$ SPDX:MIT https://opensource.org/licenses/MIT $RP_END_LICENSE$
  *
 */
-extern crate bindgen;
+use std::env;
 
 fn main() {
     // invalidate the built crate whenever the wrapper changes
     println!("cargo:rerun-if-changed=capi/capi-map.h");
-
+    println!("cargo:rustc-link-search=/usr/local/lib64");
+    if let Ok(value) = env::var("CARGO_TARGET_DIR") {
+        if let Ok(profile) = env::var("PROFILE") {
+            println!("cargo:rustc-link-search=crate={}{}", value, profile);
+        }
+    }
     let header = "
     // -----------------------------------------------------------------------
     //         <- private '_capi_map.rs' Rust/C unsafe binding ->
