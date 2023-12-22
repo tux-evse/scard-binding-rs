@@ -9,6 +9,9 @@
 use std::env;
 
 fn main() {
+    // check pkgconfig dependencies
+    system_deps::Config::new().probe().unwrap();
+
     // invalidate the built crate whenever the wrapper changes
     println!("cargo:rerun-if-changed=capi/capi-map.h");
     println!("cargo:rustc-link-search=/usr/local/lib64");

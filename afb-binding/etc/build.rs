@@ -8,6 +8,9 @@
 */
 
 fn main() {
+    // check pkgconfig dependencies
+    system_deps::Config::new().probe().unwrap();
+
     println!("cargo:rustc-link-search=/usr/local/lib64");
     println!("cargo:rustc-link-arg=-lpcscd-glue");
     println!("cargo:rustc-link-arg=-lpcsclite");

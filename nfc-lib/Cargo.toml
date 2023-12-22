@@ -10,8 +10,12 @@ build = "capi/build.rs"
 afbv4 = {git= "https://github.com/redpesk-common/afb-librust", branch="master", optional = true}
 
 [build-dependencies]
+system-deps = "2.0"
 bindgen    = ">=0.69"
 cc = "1"
+
+[package.metadata.system-deps]
+libpcsclite = "1.9"
 
 [lib]
 name = "libnfc"
