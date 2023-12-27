@@ -34,7 +34,7 @@ fn main() {
     let _capi_map
      = bindgen::Builder::default()
         .header("capi/capi-map.h")
-        .clang_arg("-F/usr/include/PCSC")
+        .clang_arg("-I/usr/include/PCSC")
         .raw_line(header)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .derive_debug(false)
