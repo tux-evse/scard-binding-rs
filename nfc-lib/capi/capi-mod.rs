@@ -19,6 +19,7 @@ use afbv4::prelude::*;
 use std::cell::Cell;
 use std::ffi::CStr;
 use std::ffi::CString;
+pub type Cchar = ::std::os::raw::c_char;
 
 pub mod cglue {
     #![allow(dead_code)]
@@ -323,7 +324,7 @@ impl PcscClient {
         }
 
         // return data is a C string
-        let cstring = unsafe { CStr::from_ptr(cdata as *const i8) };
+        let cstring = unsafe { CStr::from_ptr(cdata as *const Cchar) };
         let slice = {
             match cstring.to_str() {
                 Err(_) => {
