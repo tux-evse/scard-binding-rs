@@ -9,6 +9,7 @@
 
 fn main() {
     // check pkgconfig dependencies
+    #[cfg(not(feature="rpm_build"))]
     system_deps::Config::new().probe().unwrap();
 
     println!("cargo:rustc-link-search=/usr/local/lib64");

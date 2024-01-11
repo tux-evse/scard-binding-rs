@@ -15,6 +15,9 @@ libnfc= {path ="../nfc-lib"}
 [build-dependencies]
 system-deps = "2.0"
 
+[features]
+rpm_build = []
+
 [package.metadata.system-deps]
 libafb ="5"
 

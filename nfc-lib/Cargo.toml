@@ -14,6 +14,9 @@ system-deps = "2.0"
 bindgen    = ">=0.69"
 cc = "1"
 
+[features]
+rpm_build = []
+
 [package.metadata.system-deps]
 libpcsclite = "1.9"
 
