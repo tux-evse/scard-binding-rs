@@ -16,5 +16,6 @@ echo auth debug mode config=$CONFDIR/*.json port=$DEVTOOL_PORT
 afb-binder --name=afb-auth --port=$DEVTOOL_PORT -v \
   --config=$CONFDIR/binder-scard.json \
   --config=$CONFDIR/binding-scard.json \
+  --config=$CONFDIR/binding-scard-debug.json \
   --tracereq=all \
   $*

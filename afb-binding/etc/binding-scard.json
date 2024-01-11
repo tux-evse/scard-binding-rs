@@ -67,12 +67,28 @@
                         "key": "key-a"
                     },
                     {
+                        "uid": "set-contract",
+                        "info": "write contract into sector:3",
+                        "action": "write",
+                        "sec": 3,
+                        "len": 48,
+                        "key": "key-b"
+                    },                    {
+                        "uid": "set-name",
+                        "info": "write contract into sector:",
+                        "action": "write",
+                        "sec": 4,
+                        "len": 48,
+                        "key": "key-b"
+                    },
+
+                    {
                         "uid": "set-status",
-                        "info": "write current status in scard",
+                        "info": "write current status in sector:5",
                         "action": "write",
                         "sec": 5,
                         "len": 48,
-                        "key": "key-b",
+                        "key": "key-b"
                     }
                 ]
             }

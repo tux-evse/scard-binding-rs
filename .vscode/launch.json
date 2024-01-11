@@ -14,7 +14,7 @@
                 "LD_LIBRARY_PATH": "/usr/local/lib64"
             },
             "args": [
-                "-v",
+                "-vv",
                 "--monitoring",
                 "--trap-faults=0",
                 "--config=afb-binding/etc/binder-scard.json",

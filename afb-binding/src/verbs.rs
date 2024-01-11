@@ -27,8 +27,10 @@ fn write_scard_cb(
     args: &AfbData,
     ctx: &mut WriteScardCtx,
 ) -> Result<(), AfbError> {
-    let data = args.get::<String>(0)?;
-
+    // because of devtools limitation we have to use a full json object
+    let jsonc = args.get::<JsoncObj>(0)?;
+    let data= jsonc.get::<String>("data")?;
+    afb_log_msg!(Notice,rqt,"writing:{}", data);
     ctx.scard.write_data(&ctx.cmd, data.as_str().as_bytes())?;
 
     rqt.reply(AFB_NO_DATA, 0);
@@ -160,6 +162,7 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
         let cmd = scard.get_cmd_by_uid(cuid.as_str())?;
         let info = cmd.get_info();
         let uid = cmd.get_uid();
+        let mut verb_usage= "none";
 
         let verb_ctx: Box<dyn AfbRqtControl> = match cmd.get_action() {
             ScardAction::READ => Box::new(ReadScardVerb {
@@ -167,10 +170,12 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
                 cmd: cmd,
             }),
 
-            ScardAction::WRITE => Box::new(WriteScardVerb {
+            ScardAction::WRITE => {
+                verb_usage= "value";
+                Box::new(WriteScardVerb {
                 scard: scard.clone(),
                 cmd: cmd,
-            }),
+            })},
 
             _ => Box::new(UuidScardVerb {
                 scard: scard.clone(),
@@ -179,6 +184,7 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
 
         let verb = AfbVerb::new(uid)
             .set_info(info)
+            .set_usage(verb_usage)
             .set_callback(verb_ctx)
             .finalize()?;
 
