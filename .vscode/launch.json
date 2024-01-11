@@ -14,11 +14,11 @@
                 "LD_LIBRARY_PATH": "/usr/local/lib64"
             },
             "args": [
-                "-vvv",
+                "-v",
                 "--monitoring",
                 "--trap-faults=0",
-                "--tracereq=all",
-                "--config=afb-binding/etc/binding-nfc-acr122u.json",
+                "--config=afb-binding/etc/binder-scard.json",
+                "--config=afb-binding/etc/binding-scard.json",
             ],
             "cwd": "${workspaceFolder}",
             "initCommands": [
