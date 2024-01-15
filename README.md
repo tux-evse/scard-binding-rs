@@ -22,6 +22,9 @@ directly from your Desktop with your own provision config file as in bellow samp
 
 **Step-by-step NFC card provisioning**
 ```
+# check your reader name (Warning: ACR122U depending on version may present different device name)
+/usr/local/redpesk/pcscs-client/bin/pcscd-client --list
+
 # cmd-group=0(uuid) => check your card model is supported
 /usr/local/redpesk/pcscs-client/bin/pcscd-client --config=afb-binding/etc/pcscd-client-test.json --group=0
 
