@@ -11,23 +11,23 @@
 
         // set acls sectors
         {"uid":"acls-contact" , "group":9, "action":"trailer","sec":3,"blk":3, "trailer": {"keyA": "key-a","keyB":"key-b","acls":["0x08","0x77","0x8F","0x00"]}},
-        {"uid":"acls-info"    , "group":9, "action":"trailer","sec":4,"blk":3, "trailer": {"keyA": "key-a","keyB":"key-b","acls":["0x08","0x77","0x8F","0x00"]}},
-        {"uid":"acls-status"  , "group":9, "action":"trailer","sec":5,"blk":3, "trailer": {"keyA": "key-a","keyB":"key-b","acls":["0x08","0x77","0x8F","0x00"]}},
+        {"uid":"acls-contract"    , "group":9, "action":"trailer","sec":4,"blk":3, "trailer": {"keyA": "key-a","keyB":"key-b","acls":["0x08","0x77","0x8F","0x00"]}},
+        {"uid":"acls-name"  , "group":9, "action":"trailer","sec":5,"blk":3, "trailer": {"keyA": "key-a","keyB":"key-b","acls":["0x08","0x77","0x8F","0x00"]}},
 
         // read sector with acl set in group=1
-        {"uid":"get-contract" ,"group":1,"action":"read","sec":3,"len":48,"key":"key-a"},
-        {"uid":"get-info"     ,"group":1,"action":"read","sec":4,"len":48,"key":"key-a"},
-        {"uid":"get-status"   ,"group":1,"action":"read","sec":5,"len":48,"key":"key-a"},
+        {"uid":"get-tagid" ,"group":1,"action":"read","sec":3,"len":48,"key":"key-a"},
+        {"uid":"get-contract"     ,"group":1,"action":"read","sec":4,"len":48,"key":"key-a"},
+        {"uid":"get-name"   ,"group":1,"action":"read","sec":5,"len":48,"key":"key-a"},
 
         // write sector with acl set in group=2
-        {"uid":"set-contract" ,"group":2,"action":"write","sec":3,"len":48,"key":"key-b", "data": "tuxevese-xxx-001"},
-        {"uid":"set-name"     ,"group":2,"action":"write","sec":4,"len":48,"key":"key-b", "data": "Mr Kermichue"},
-        {"uid":"set-status"   ,"group":2,"action":"write","sec":5,"len":48,"key":"key-b", "data": "xxxxxxxxxxxx"},
+        {"uid":"set-tagid" ,"group":2,"action":"write","sec":3,"len":48,"key":"key-b", "data": "tux-evse-001"},
+        {"uid":"set-name"     ,"group":2,"action":"write","sec":4,"len":48,"key":"key-b", "data": "{'imax':32, 'pmax':22, 'ocpp':false}"},
+        {"uid":"set-name"   ,"group":2,"action":"write","sec":5,"len":48,"key":"key-b", "data": "Mme Kermichue"},
 
         // write sector with acl set in group=3
-        {"uid":"set-contract" ,"group":3,"action":"write","sec":3,"len":48,"key":"key-b", "data": "tuxevese-xxx-002"},
-        {"uid":"set-name"     ,"group":3,"action":"write","sec":4,"len":48,"key":"key-b", "data": "Mme Kermichue"},
-        {"uid":"set-status"   ,"group":3,"action":"write","sec":5,"len":48,"key":"key-b", "data": "zzzzzzzzzzz"}
+        {"uid":"set-tagid" ,"group":3,"action":"write","sec":3,"len":48,"key":"key-b", "data": "tux-evse-002"},
+        {"uid":"set-name"     ,"group":3,"action":"write","sec":4,"len":48,"key":"key-b", "data": "{'imax':16, 'pmax':22, 'ocpp':true}"},
+        {"uid":"set-name"   ,"group":3,"action":"write","sec":5,"len":48,"key":"key-b", "data": "Mr Kermichue"}
 
     ]
 }
