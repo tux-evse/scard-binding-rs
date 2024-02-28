@@ -277,8 +277,8 @@ impl PcscClient {
     pub fn reader_check(&self) -> Result<(), AfbError> {
         let handle = self.handle.get();
 
-        // get reader status and wait 10 timeout for card
-        let err = unsafe { cglue::pcscReaderCheck(handle, 10) };
+        // get reader status and wait 20 timeout for card
+        let err = unsafe { cglue::pcscReaderCheck(handle, 20) };
         if err != 0 {
             return afb_error!(
                 "pcsc-sync-check",
