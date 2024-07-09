@@ -21,12 +21,13 @@ struct WriteScardCtx {
     cmd: ScardCmd,
 }
 
-AfbVerbRegister!(WriteScardVerb, write_scard_cb, WriteScardCtx);
 fn write_scard_cb(
     rqt: &AfbRequest,
-    args: &AfbData,
-    ctx: &mut WriteScardCtx,
+    args: &AfbRqtData,
+    ctx: &AfbCtxData,
 ) -> Result<(), AfbError> {
+    
+    let ctx = ctx.get_ref::<WriteScardCtx>()?;
     // because of devtools limitation we have to use a full json object
     let jsonc = args.get::<JsoncObj>(0)?;
     let data= jsonc.get::<String>("data")?;
@@ -42,12 +43,13 @@ struct ReadScardCtx {
     cmd: ScardCmd,
 }
 
-AfbVerbRegister!(ReadScardVerb, read_scard_cb, ReadScardCtx);
 fn read_scard_cb(
     rqt: &AfbRequest,
-    _args: &AfbData,
-    ctx: &mut ReadScardCtx,
+    _args: &AfbRqtData,
+    ctx: &AfbCtxData,
 ) -> Result<(), AfbError> {
+
+    let ctx = ctx.get_ref::<ReadScardCtx>()?;
     let data = ctx.scard.read_data(&ctx.cmd)?;
     rqt.reply(data, 0);
     Ok(())
@@ -57,12 +59,13 @@ struct UuidScardCtx {
     scard: Rc<ScardHandle>,
 }
 
-AfbVerbRegister!(UuidScardVerb, uuid_scard_cb, UuidScardCtx);
 fn uuid_scard_cb(
     rqt: &AfbRequest,
-    _args: &AfbData,
-    ctx: &mut UuidScardCtx,
+    _args: &AfbRqtData,
+    ctx: &AfbCtxData,
 ) -> Result<(), AfbError> {
+
+    let ctx = ctx.get_ref::<UuidScardCtx>()?;
     let uuid = ctx.scard.get_uuid()?;
     rqt.reply(uuid, 0);
     Ok(())
@@ -97,12 +100,15 @@ struct EventScardCtx {
     scard: Rc<ScardHandle>,
     monitor: Rc<ScardMonitorCtx>,
 }
-AfbVerbRegister!(EventScardVerb, event_scard_cb, EventScardCtx);
+
 fn event_scard_cb(
     rqt: &AfbRequest,
-    args: &AfbData,
-    ctx: &mut EventScardCtx,
+    args: &AfbRqtData,
+    ctx: &AfbCtxData,
 ) -> Result<(), AfbError> {
+
+    let ctx = ctx.get_ref::<EventScardCtx>()?;
+
     match args.get::<&ApiAction>(0)? {
         ApiAction::START => {
             if ctx.monitor.tid.get() == 0 {
@@ -121,6 +127,12 @@ fn event_scard_cb(
     Ok(())
 }
 
+type AfbVerbCallback = fn(
+    rqt: &AfbRequest,
+    args: &AfbRqtData,
+    ctx: &AfbCtxData,
+) -> Result<(), AfbError>;
+
 pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(), AfbError> {
     // parse NFC config and connect to reader
     let event = AfbEvent::new("reader");
@@ -138,21 +150,26 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
         Some(Box::leak(callback)),
     )?);
 
-    let verb_ctx = Box::new(EventScardVerb {
-        scard: scard.clone(),
-        monitor: monitor.clone(),
-    });
-
     let _verb = AfbVerb::new("monitoring")
         .set_info("subscribe to scard transaction event")
-        .set_action("['START','STOP']")?
-        .set_callback(verb_ctx)
+        .set_actions("['START','STOP']")?
+        .set_callback(event_scard_cb)
+        .set_context(EventScardCtx {
+            scard: scard.clone(),
+            monitor: monitor.clone(),
+        })
         .finalize()?;
 
     // TBD (Fulup) TBD Monitoring works but preempt pcscclient.
     // It should probably use an independent pcscClient handle
     // api.add_verb(verb);
     // api.add_event(event);
+    
+    enum ScardContext {
+        Read(ReadScardCtx),
+        Write(WriteScardCtx),
+        Uuid(UuidScardCtx),
+    }
 
     // loop on command and create corresponding verbs
     let cmds = config.nfc.clone().get::<JsoncObj>("cmds")?;
@@ -162,30 +179,41 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
         let cmd = scard.get_cmd_by_uid(cuid.as_str())?;
         let info = cmd.get_info();
         let uid = cmd.get_uid();
-        let mut verb_usage= "none";
+        let mut verb_usage = "none";
 
-        let verb_ctx: Box<dyn AfbRqtControl> = match cmd.get_action() {
-            ScardAction::READ => Box::new(ReadScardVerb {
-                scard: scard.clone(),
-                cmd: cmd,
-            }),
+        let (verb_ctx, verb_callback): (ScardContext, AfbVerbCallback) = match cmd.get_action() {
+            ScardAction::READ => (
+                ScardContext::Read(ReadScardCtx {
+                    scard: scard.clone(),
+                    cmd: cmd,
+                }),
+                read_scard_cb as AfbVerbCallback,
+            ),
 
             ScardAction::WRITE => {
-                verb_usage= "value";
-                Box::new(WriteScardVerb {
-                scard: scard.clone(),
-                cmd: cmd,
-            })},
+                verb_usage = "value";
+                (
+                    ScardContext::Write(WriteScardCtx {
+                        scard: scard.clone(),
+                        cmd: cmd,
+                    }),
+                    write_scard_cb as AfbVerbCallback,
+                )
+            }
 
-            _ => Box::new(UuidScardVerb {
-                scard: scard.clone(),
-            }),
+            _ => (
+                ScardContext::Uuid(UuidScardCtx {
+                    scard: scard.clone(),
+                }),
+                uuid_scard_cb as AfbVerbCallback,
+            ),
         };
 
         let verb = AfbVerb::new(uid)
             .set_info(info)
             .set_usage(verb_usage)
-            .set_callback(verb_ctx)
+            .set_callback(verb_callback)
+            .set_context(verb_ctx)
             .finalize()?;
 
         api.add_verb(verb);
@@ -193,3 +221,4 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
 
     Ok(())
 }
+
