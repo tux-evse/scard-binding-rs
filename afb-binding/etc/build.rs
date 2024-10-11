@@ -7,12 +7,19 @@
  *
 */
 
+use std::env;
+
 fn main() {
     // check pkgconfig dependencies
-    #[cfg(not(feature="rpm_build"))]
+    #[cfg(not(feature = "rpm_build"))]
     system_deps::Config::new().probe().unwrap();
 
     println!("cargo:rustc-link-search=/usr/local/lib64");
+    if let Ok(value) = env::var("CARGO_TARGET_DIR") {
+        if let Ok(profile) = env::var("PROFILE") {
+            println!("cargo:rustc-link-search=crate={}{}", value, profile);
+        }
+    }
     println!("cargo:rustc-link-arg=-lpcscd-glue");
     println!("cargo:rustc-link-arg=-lpcsclite");
 }
